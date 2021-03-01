@@ -1,9 +1,6 @@
 from pathlib import Path
-import sys
 
 import config as general_config
-
-sys.path.insert(0, "..")  # add config to path
 
 # Output directory ('density' as an example)
 DATASET_DIR = Path(general_config.PROJECT_ROOT) / "chembl"
