@@ -21,7 +21,7 @@ from optuna.integration import PyTorchLightningPruningCallback
 
 # Our Methods
 from . import SubGNN as md
-import config
+from . import config
 
 
 def parse_arguments():

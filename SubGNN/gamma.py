@@ -1,7 +1,7 @@
 # Dynamic time warping
 from fastdtw import fastdtw
 
-import config
+from . import config
 
 
 ###########################################

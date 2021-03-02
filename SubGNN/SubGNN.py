@@ -29,7 +29,7 @@ import networkx as nx
 
 # Our Methods
 # sys.path.insert(0, "..")  # add config to path
-import config
+from . import config
 from . import subgraph_utils
 from .subgraph_mpn import SG_MPN
 from .datasets import SubgraphDataset

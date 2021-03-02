@@ -1,13 +1,7 @@
-from pathlib import Path
-
-import config as general_config
+from SubGNN import config as general_config
 
 # Output directory ('density' as an example)
-DATASET_DIR = Path(general_config.PROJECT_ROOT) / "chembl"
-
-# Flags
-GENERATE_SYNTHETIC_G = False  # whether to generate synthetic graph
-GENERATE_NODE_EMB = True  # whether to generate node embeddings
+DATASET_DIR = general_config.PROJECT_ROOT / "bace"
 
 # Random Seed
 RANDOM_SEED = 42
@@ -39,14 +33,14 @@ CC_RANGE = [1, 1, 1, 1, 5, 6, 7, 8, 9, 10]
 MAX_TRIES = 100
 
 # Parameters for training node embeddings for base graph
-CONV = "graphsaint_gcn"
 # CONV = "gin"
-MINIBATCH = "GraphSaint"
-# MINIBATCH = "NeighborSampler"
-POSSIBLE_BATCH_SIZES = [512]
+CONV = "gin"
+# MINIBATCH = "GraphSaint"
+MINIBATCH = "NeighborSampler"
+POSSIBLE_BATCH_SIZES = [128, 256]
 POSSIBLE_HIDDEN = [128]
 POSSIBLE_OUTPUT = [64]
-POSSIBLE_LR = [0.001]
+POSSIBLE_LR = [0.001, 0.0001]
 POSSIBLE_WD = [5e-5]
 POSSIBLE_DROPOUT = [0.4]
 POSSIBLE_NB_SIZE = [-1]
