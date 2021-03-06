@@ -2,7 +2,7 @@
     "data": {
         "task":"density"
     },
-    "no_gpu":true, //add this line to use CPU
+    "no_gpu":false,
 
     "tb": {
         "tb_logging":true,
