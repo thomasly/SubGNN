@@ -1,7 +1,7 @@
 from SubGNN import config as general_config
 
 # Output directory ('density' as an example)
-DATASET_DIR = general_config.PROJECT_ROOT / "bace"
+DATASET_DIR = general_config.PROJECT_ROOT / "testing_data"
 
 # Random Seed
 RANDOM_SEED = 42
@@ -59,5 +59,5 @@ CALCULATE_DEGREE_SEQUENCE = (
 CALCULATE_EGO_GRAPHS = (
     True  # Calculate the 1-hop ego graph associated with each node in the graph
 )
-OVERRIDE = True  # Overwrite a similarity file even if it exists
+OVERRIDE = False  # Overwrite a similarity file even if it exists
 N_PROCESSSES = 10  # Number of cores to use when precomputing similarity metrics

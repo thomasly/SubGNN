@@ -16,7 +16,7 @@ Use this script to precompute information about the underlying base graph.
 
 def get_shortest_path(node_id):
     NIdToDistH = snap.TIntH()
-    # path_len = snap.GetShortPath(snap_graph, int(node_id), NIdToDistH)
+    _ = snap.GetShortPath(snap_graph, int(node_id), NIdToDistH)
     paths = np.zeros((max(node_ids) + 1))  # previously was n_nodes
     for dest_node in NIdToDistH:
         paths[dest_node] = NIdToDistH[dest_node]
@@ -72,18 +72,19 @@ def calculate_stats():
                     slc = slice(i * chunk, min((i + 1) * chunk, len(node_ids)))
                     shortest_paths.extend(pool.map(get_shortest_path, node_ids[slc]))
                     i += 1
-
             all_shortest_paths = np.stack(shortest_paths)
             np.save(
                 str(config.DATASET_DIR / "shortest_path_matrix.npy"), all_shortest_paths
             )
 
 
-# get SNAP graph for the specified dataset
-snap_graph = snap.LoadEdgeList(
-    snap.PUNGraph, str(config.DATASET_DIR / "edge_list.txt"), 0, 1
-)
-node_ids = np.sort([node.GetId() for node in snap_graph.Nodes()])
+if __name__ == "__main__":
+    # get SNAP graph for the specified dataset
+    # PUNGraph is python instance of snap's TUNGraph (undirected graph)
+    snap_graph = snap.LoadEdgeList(
+        snap.PUNGraph, str(config.DATASET_DIR / "edge_list.txt"), 0, 1
+    )
+    node_ids = np.sort([node.GetId() for node in snap_graph.Nodes()])
 
-# calculate graph metrics
-calculate_stats()
+    # calculate graph metrics
+    calculate_stats()
