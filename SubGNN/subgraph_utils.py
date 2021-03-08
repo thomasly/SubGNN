@@ -11,7 +11,7 @@ from sklearn.metrics import f1_score, accuracy_score
 import torch
 
 # Our methods
-import config
+from SubGNN import config
 
 
 def read_subgraphs(sub_f, split=True):

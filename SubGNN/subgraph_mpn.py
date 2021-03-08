@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch_geometric.nn import MessagePassing
 
 # Our methods
-import config
+from SubGNN import config
 
 
 class SG_MPN(MessagePassing):
@@ -33,7 +33,7 @@ class SG_MPN(MessagePassing):
     ):
         """
         Concatenate the connected component and anchor patch embeddings into a single
-        matrix. This will be used an input for the pytorch geometric message passing
+        matrix. This will be used as input for the pytorch geometric message passing
         framework.
         """
         batch_sz, max_n_cc, cc_hidden_dim = cc_embeds.shape
@@ -274,6 +274,7 @@ class SG_MPN(MessagePassing):
         coll_dict = self.__collect__(self.__user_args__, edge_index, size, kwargs)
 
         msg_kwargs = self.inspector.distribute("message", coll_dict)
+        # here is the difference between original propagate and this implement
         msg_out = self.message(**msg_kwargs)
 
         aggr_kwargs = self.inspector.distribute("aggregate", coll_dict)
@@ -282,6 +283,7 @@ class SG_MPN(MessagePassing):
         update_kwargs = self.inspector.distribute("update", coll_dict)
         out = self.update(out, **update_kwargs)
 
+        # returns both out and msg_out
         return out, msg_out
 
     def message(self, x_j, similarity):  # default is source to target

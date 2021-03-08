@@ -31,7 +31,7 @@ from optuna.integration import PyTorchLightningPruningCallback
 
 # Our Methods
 from . import SubGNN as md
-import config
+from SubGNN import config
 
 
 ###################################################

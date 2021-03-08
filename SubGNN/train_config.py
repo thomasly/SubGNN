@@ -21,7 +21,7 @@ from optuna.integration import PyTorchLightningPruningCallback
 
 # Our Methods
 from . import SubGNN as md
-from . import config
+from SubGNN import config
 
 
 def parse_arguments():
@@ -243,7 +243,6 @@ def main():
 
     # Set paths to data
     task = run_config["data"]["task"]
-    embedding_type = run_config["hyperparams_fix"]["embedding_type"]
 
     # paths to subgraphs, edge list, and shortest paths between all nodes in the graph
     run_config["subgraphs_path"] = os.path.join(task, "subgraphs.pth")
@@ -256,14 +255,7 @@ def main():
     run_config["similarities_path"] = os.path.join(task, "similarities/")
 
     # get location of node embeddings
-    if embedding_type == "gin":
-        run_config["embedding_path"] = os.path.join(task, "gin_embeddings.pth")
-    elif embedding_type == "graphsaint":
-        run_config["embedding_path"] = os.path.join(
-            task, "graphsaint_gcn_embeddings.pth"
-        )
-    else:
-        raise NotImplementedError
+    run_config["embedding_path"] = os.path.join(task, "atom_features.pth")
 
     # create a tensorboard directory in the folder specified by dir in the PROJECT ROOT
     # folder
