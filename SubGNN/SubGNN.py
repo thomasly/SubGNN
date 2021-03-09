@@ -128,8 +128,9 @@ class SubGNN(pl.LightningModule):
         # read in data
         self.read_data()
 
-        # initialize MPN layers for each channel (neighborhood, structure, position;
-        # internal, border) and each layer (up to 'n_layers')
+        # initialize message passing network (MPN) layers for each channel
+        # (neighborhood, structure, position; internal, border) and each layer
+        # (up to 'n_layers')
         hid_dim = self.hparams["node_embed_size"]
         self.neighborhood_mpns = nn.ModuleList()
         if self.hparams["use_neighborhood"]:
@@ -330,7 +331,7 @@ class SubGNN(pl.LightningModule):
     ):
 
         """
-        subgraph_ids: (batch_sz, max_len_sugraph)
+        subgraph_ids: (batch_sz, max_len_subgraph)
         cc_ids: (batch_sz, max_n_cc, max_len_cc)
         """
 
@@ -369,6 +370,7 @@ class SubGNN(pl.LightningModule):
                 S_B_cc_embed, 0, subgraph_idx.squeeze(-1)
             )
 
+        # _ = node embedding dim
         batch_sz, max_n_cc, _ = init_cc_embeds.shape
 
         # get mask for cc_embeddings
@@ -875,15 +877,11 @@ class SubGNN(pl.LightningModule):
             new_subg.append([c + 1 for c in subg])
         return new_subg
 
-    def read_data(self):
-        """
-        Read in the subgraphs & their associated labels
-        """
-
+    def _read_nx_graph(self):
         # read networkx graph from edge list
         self.networkx_graph = nx.read_edgelist(config.PROJECT_ROOT / self.graph_path)
 
-        # readin list of node ids for each subgraph & their labels
+    def _read_subgraph(self):
         (
             self.train_sub_G,
             self.train_sub_G_label,
@@ -893,8 +891,8 @@ class SubGNN(pl.LightningModule):
             self.test_sub_G_label,
         ) = subgraph_utils.read_subgraphs(config.PROJECT_ROOT / self.subgraph_path)
 
-        # check if the dataset is multilabel (e.g. HPO-NEURO)
-        if type(self.train_sub_G_label) == list:
+    def _init_labels(self):
+        if isinstance(self.train_sub_G_label, list):
             self.multilabel = True
             all_labels = (
                 self.train_sub_G_label + self.val_sub_G_label + self.test_sub_G_label
@@ -904,7 +902,7 @@ class SubGNN(pl.LightningModule):
             self.multilabel = False
             self.multilabel_binarizer = None
 
-        # Optionally subset the data for debugging purposes to the batch size
+    def _subset_dataset(self):
         if "subset_data" in self.hparams and self.hparams["subset_data"]:
             print("****WARNING: SUBSETTING DATA*****")
             (
@@ -923,8 +921,8 @@ class SubGNN(pl.LightningModule):
                 self.test_sub_G_label[0 : self.hparams["batch_size"]],
             )
 
-        # get the number of classes for prediction
-        if type(self.train_sub_G_label) == list:  # if multi-label
+    def _get_n_classes(self):
+        if isinstance(self.train_sub_G_label, list):  # if multi-label
             self.num_classes = (
                 max(
                     [
@@ -952,14 +950,14 @@ class SubGNN(pl.LightningModule):
                 + 1
             )
 
-        # renumber nodes to start with index 1 instead of 0
+    def _reindexing_nodes(self):
         mapping = {n: int(n) + 1 for n in self.networkx_graph.nodes()}
         self.networkx_graph = nx.relabel_nodes(self.networkx_graph, mapping)
         self.train_sub_G = self.reindex_data(self.train_sub_G)
         self.val_sub_G = self.reindex_data(self.val_sub_G)
         self.test_sub_G = self.reindex_data(self.test_sub_G)
 
-        # Initialize pretrained node embeddings
+    def _init_node_emb(self):
         pretrained_node_embeds = torch.load(
             config.PROJECT_ROOT / self.embedding_path, torch.device("cpu")
         )  # feature matrix should be initialized to the node embeddings
@@ -976,6 +974,25 @@ class SubGNN(pl.LightningModule):
             padding_idx=config.PAD_VALUE,
         ).to(self.device)
 
+    def read_data(self):
+        """
+        Read in the subgraphs & their associated labels
+        """
+        print("--- Reading in data ---")
+        # read networkx graph from edge list
+        self._read_nx_graph()
+        # readin list of node ids for each subgraph & their labels
+        self._read_subgraph()
+        # check if the dataset is multilabel (e.g. HPO-NEURO)
+        self._init_labels()
+        # Optionally subset the data for debugging purposes to the batch size
+        self._subset_dataset()
+        # get the number of classes for prediction
+        self._get_n_classes()
+        # renumber nodes to start with index 1 instead of 0
+        self._reindexing_nodes()
+        # Initialize pretrained node embeddings
+        self._init_node_emb()
         print("--- Finished reading in data ---")
 
     ##################################################
@@ -1134,6 +1151,7 @@ class SubGNN(pl.LightningModule):
         # for each component in each subgraph, calculate the k-hop node border of the
         # connected component
         for s, subgraph in enumerate(cc_ids):
+            # subgraph shape: max_n_cc x max_n_cc_nodes
             border_sets = []
             for c, component in enumerate(subgraph):
                 # radius specifies the size of the border set - i.e. the k number of
@@ -2083,3 +2101,192 @@ class SubGNN(pl.LightningModule):
 
     def backward(self, trainer, loss, optimizer, optimizer_idx):
         loss.backward(retain_graph=True)
+
+
+class SubGNN_Chem(SubGNN):
+    def _read_subgraph(self):
+        (
+            self.train_sub_G,
+            self.train_sub_G_label,
+            self.train_sub_G_substructs,
+            self.train_smiles,
+            self.val_sub_G,
+            self.val_sub_G_label,
+            self.val_sub_G_substructs,
+            self.val_smiles,
+            self.test_sub_G,
+            self.test_sub_G_label,
+            self.test_sub_G_substructs,
+            self.test_smiles,
+        ) = subgraph_utils.read_subgraphs_w_substructs(
+            config.PROJECT_ROOT / self.subgraph_path
+        )
+
+    def initialize_cc_ids(self, substructs):
+        """ Override initialize_cc_ids of the original SubGNN. Use chemicals as
+        Subgraphs. Chemical substructures as connected components.
+
+        Args:
+            subgraph_ids: list of subgraphs where each subgraph is a chemical
+                represented by a list of node ids
+
+        Output:
+            reshaped_cc_ids_pad: padded tensor of shape (n_subgraphs, max_n_cc,
+                max_len_cc)
+        """
+        n_subgraphs = len(substructs)  # number of chemicals
+
+        # Create substructure ID list from chemicals
+        substruct_id_list = []
+        for sst in substructs:
+            substruct_id_list.append([torch.LongTensor(sst_ids) for sst_ids in sst])
+
+        # pad number of substructures
+        max_n_sst = max(
+            [len(sst_list) for sst_list in substruct_id_list]
+        )  # max number of substructures across all chemicals
+        for sst_list in substruct_id_list:
+            while True:
+                if len(sst_list) == max_n_sst:
+                    break
+                sst_list.append(torch.LongTensor([config.PAD_VALUE]))
+
+        # pad number of nodes in substructures
+        all_pad_sst_ids = [sst for sst_list in substruct_id_list for sst in sst_list]
+        assert len(all_pad_sst_ids) % max_n_sst == 0
+        substruct_ids_pad = pad_sequence(
+            all_pad_sst_ids, batch_first=True, padding_value=config.PAD_VALUE
+        )  # (batch_sz * max_n_cc, max_cc_len)
+        reshaped_sst_ids_pad = substruct_ids_pad.view(
+            n_subgraphs, max_n_sst, -1
+        )  # (batch_sz, max_n_cc, max_cc_len)
+
+        return reshaped_sst_ids_pad  # (n_subgraphs, max_n_cc, max_len_cc)
+
+    def prepare_test_data(self):
+        """
+        Same as prepare_data, but for test dataset
+        """
+
+        print("--- Started Preparing Test Data ---")
+        self.test_cc_ids = self.initialize_cc_ids(self.test_sub_G_substructs)
+
+        print("--- Initialize embeddings ---")
+        self.init_all_embeddings(split="test", trainable=self.hparams["trainable_cc"])
+
+        print("--- Getting Border Sets ---")
+        self.get_border_sets(split="test")
+
+        print("--- Getting Similarities ---")
+        self.get_similarities(split="test")
+
+        print("--- Initializing Anchor Patches ---")
+        # note that we don't need to initialize border position & structure anchor
+        # patches because those are shared
+        if self.hparams["use_neighborhood"]:
+            (
+                self.anchors_neigh_int,
+                self.anchors_neigh_border,
+            ) = init_anchors_neighborhood(
+                "test",
+                self.hparams,
+                self.networkx_graph,
+                self.device,
+                None,
+                None,
+                self.test_cc_ids,
+                None,
+                None,
+                self.test_N_border,
+            )
+        else:
+            self.anchors_neigh_int, self.anchors_neigh_border = None, None
+        if self.hparams["use_position"]:
+            self.anchors_pos_int = init_anchors_pos_int(
+                "test",
+                self.hparams,
+                self.networkx_graph,
+                self.device,
+                self.train_sub_G,
+                self.val_sub_G,
+                self.test_sub_G,
+            )
+        else:
+            self.anchors_pos_int = None
+
+        print("--- Finished Preparing Test Data ---")
+
+    def prepare_data(self):
+        """
+        Initialize connected components, precomputed similarity calculations, and
+        anchor patches
+        """
+        print("--- Started Preparing Data ---", flush=True)
+
+        # Intialize connected component matrix (n_subgraphs, max_n_cc, max_len_cc)
+        self.train_cc_ids = self.initialize_cc_ids(self.train_sub_G_substructs)
+        self.val_cc_ids = self.initialize_cc_ids(self.val_sub_G_substructs)
+
+        # initialize embeddings for each cc
+        # 'trainable_cc' flag determines whether the cc embeddings are trainable
+        print("--- Initializing CC Embeddings ---", flush=True)
+        self.init_all_embeddings(
+            split="train_val", trainable=self.hparams["trainable_cc"]
+        )
+
+        # Initialize border sets for each cc
+        print("--- Initializing CC Border Sets ---", flush=True)
+        self.get_border_sets(split="train_val")
+
+        # calculate similarities
+        print("--- Getting Similarities ---", flush=True)
+        self.get_similarities(split="train_val")
+
+        # Initialize neighborhood, position, and structure anchor patches
+        print("--- Initializing Anchor Patches ---", flush=True)
+        if self.hparams["use_neighborhood"]:
+            (
+                self.anchors_neigh_int,
+                self.anchors_neigh_border,
+            ) = init_anchors_neighborhood(
+                "train_val",
+                self.hparams,
+                self.networkx_graph,
+                self.device,
+                self.train_cc_ids,
+                self.val_cc_ids,
+                None,
+                self.train_N_border,
+                self.val_N_border,
+                None,
+            )  # we pass in None for the test_N_border
+        else:
+            self.anchors_neigh_int, self.anchors_neigh_border = None, None
+        if self.hparams["use_position"]:
+            self.anchors_pos_int = init_anchors_pos_int(
+                "train_val",
+                self.hparams,
+                self.networkx_graph,
+                self.device,
+                self.train_sub_G,
+                self.val_sub_G,
+                self.test_sub_G,
+            )
+            self.anchors_pos_ext = init_anchors_pos_ext(
+                self.hparams, self.networkx_graph, self.device
+            )
+        else:
+            self.anchors_pos_int, self.anchors_pos_ext = None, None
+        if self.hparams["use_structure"]:
+            # pass in precomputed sampled structure anchor patches and random walks
+            # from which to further subsample
+            self.anchors_structure = init_anchors_structure(
+                self.hparams,
+                self.structure_anchors,
+                self.int_structure_anchor_random_walks,
+                self.bor_structure_anchor_random_walks,
+            )
+        else:
+            self.anchors_structure = None
+
+        print("--- Finished Preparing Data ---", flush=True)

@@ -100,6 +100,126 @@ def read_subgraphs(sub_f, split=True):
     )
 
 
+def read_subgraphs_w_substructs(sub_f, split=True):
+    """
+    Read subgraphs from file
+
+    Args
+       sub_f (str): filename where subgraphs are stored
+
+    Return for each train, val, test split:
+       sub_G (list): list of nodes belonging to each subgraph
+       sub_G_label (list): labels for each subgraph
+       sub_G_substructs (list): substructures of each chemical compound
+    """
+
+    # Enumerate/track labels
+    label_idx = 0
+    labels = {}
+
+    # Train/Val/Test subgraphs
+    train_sub_G = []
+    val_sub_G = []
+    test_sub_G = []
+
+    # Train/Val/Test subgraph labels
+    train_sub_G_label = []
+    val_sub_G_label = []
+    test_sub_G_label = []
+
+    # Train/Val/Test substructures
+    train_sub_G_substructs = []
+    val_sub_G_substructs = []
+    test_sub_G_substructs = []
+
+    # Train/Val/Test SMILES
+    train_smiles = []
+    val_smiles = []
+    test_smiles = []
+
+    # Train/Val/Test masks
+    train_mask = []
+    val_mask = []
+    test_mask = []
+
+    multilabel = False
+
+    # Parse data
+    with open(sub_f) as fin:
+        subgraph_idx = 0
+        for line in fin:
+            tokens = line.split("\t")
+            nodes = [int(n) for n in tokens[0].split("-") if n != ""]
+            substructs = []
+            for sst in tokens[3:-1]:
+                substructs.append(list(map(int, sst.split("-"))))
+            smiles = tokens[-1]
+            if len(nodes) != 0:
+                if len(nodes) == 1:
+                    print(nodes)
+                label = tokens[1].split("-")
+                if len(label) > 1:
+                    multilabel = True
+                for lab in label:
+                    if lab not in labels.keys():
+                        labels[lab] = label_idx
+                        label_idx += 1
+                if tokens[2].strip() == "train":
+                    train_sub_G.append(nodes)
+                    train_sub_G_substructs.append(substructs)
+                    train_smiles.append(smiles)
+                    train_sub_G_label.append([labels[lab] for lab in label])
+                    train_mask.append(subgraph_idx)
+                elif tokens[2].strip() == "val":
+                    val_sub_G.append(nodes)
+                    val_sub_G_substructs.append(substructs)
+                    val_smiles.append(smiles)
+                    val_sub_G_label.append([labels[lab] for lab in label])
+                    val_mask.append(subgraph_idx)
+                elif tokens[2].strip() == "test":
+                    test_sub_G.append(nodes)
+                    test_sub_G_substructs.append(substructs)
+                    test_smiles.append(smiles)
+                    test_sub_G_label.append([labels[lab] for lab in label])
+                    test_mask.append(subgraph_idx)
+                subgraph_idx += 1
+    if not multilabel:
+        train_sub_G_label = torch.tensor(train_sub_G_label).long().squeeze()
+        val_sub_G_label = torch.tensor(val_sub_G_label).long().squeeze()
+        test_sub_G_label = torch.tensor(test_sub_G_label).long().squeeze()
+
+    if len(val_mask) < len(test_mask):
+        return (
+            train_sub_G,
+            train_sub_G_label,
+            train_sub_G_substructs,
+            train_smiles,
+            test_sub_G,
+            test_sub_G_label,
+            test_sub_G_substructs,
+            test_smiles,
+            val_sub_G,
+            val_sub_G_label,
+            val_sub_G_substructs,
+            val_smiles,
+        )
+
+    return (
+        train_sub_G,
+        train_sub_G_label,
+        train_sub_G_substructs,
+        train_smiles,
+        val_sub_G,
+        val_sub_G_label,
+        val_sub_G_substructs,
+        val_smiles,
+        test_sub_G,
+        test_sub_G_label,
+        test_sub_G_substructs,
+        test_smiles,
+    )
+
+
 def calc_f1(logits, labels, avg_type="macro", multilabel_binarizer=None):
     """
     Calculates the F1 score (either macro or micro as defined by 'avg_type') for the
