@@ -5,6 +5,7 @@ from rdkit import Chem
 import pandas as pd
 from tqdm import tqdm
 from PyFingerprint.All_Fingerprint import get_fingerprint
+import torch
 
 from SubGNN import config
 from . import config_prepare_dataset as pdconfig
@@ -48,7 +49,7 @@ allowable_features = {
 
 
 def get_pubchem_fingerprint(smiles):
-    fp = get_fingerprint(smiles, fp_type="pubchem", output="vector")
+    fp = get_fingerprint(smiles, fp_type="pubchem")
     return list(map(str, list(fp)))
 
 
@@ -100,7 +101,6 @@ def write_to_subgraphs(
     subgraphs,
     label,
     smiles,
-    atom_features,
     path=None,
     starting_idx=0,
     split="train",
@@ -142,6 +142,7 @@ def write_to_subgraphs(
     atom_ids = [str(id + starting_idx) for id in atom_ids]
     subgraphs_f.write("-".join(atom_ids) + "\t")
     subgraphs_f.write("-".join(label) + "\t")
+    subgraphs_f.write(split + "\t")
     for value in subgraphs.values():
         for subgraph in value:
             subgraphs_f.write(
@@ -151,10 +152,17 @@ def write_to_subgraphs(
     subgraphs_f.write("\n")
     subgraphs_f.close()
 
-    atom_features_f = open(os.path.join(path, "atom_features.pth"), method)
-    for feat in atom_features:
-        atom_features_f.write(" ".join(map(str, feat)) + "\n")
-    atom_features_f.close()
+
+def write_atom_features(atom_features, path):
+    """ Write atom features to file.
+
+    Args:
+        atom_features (list): list of lists of atom features.
+        path (str): path to save the atom features.
+    """
+    atom_feat_f = os.path.join(path, "atom_features.pth")
+    features = torch.tensor(atom_features, dtype=torch.int)
+    torch.save(features, atom_feat_f)
 
 
 def prepare_dataset(ser):
@@ -188,6 +196,7 @@ def to_subgraphs(patterns, ser, save_path):
     """
     n_samples, train_indices, val_indices, _ = prepare_dataset(ser)
     starting_idx = 0
+    all_atom_features = list()
     for i, smi in tqdm(enumerate(ser), total=n_samples):
         mol = Chem.MolFromSmiles(smi)
         if mol is None:
@@ -197,6 +206,7 @@ def to_subgraphs(patterns, ser, save_path):
         subgraphs, label = find_subgraph_and_label(mol, smi, patterns)
         atom_ids = [a.GetIdx() for a in mol.GetAtoms()]
         atom_features = generate_node_feat(mol)
+        all_atom_features.extend(atom_features)
         if i in train_indices:
             split = "train"
         elif i in val_indices:
@@ -213,13 +223,13 @@ def to_subgraphs(patterns, ser, save_path):
             subgraphs,
             label,
             smi,
-            atom_features,
             save_path,
             starting_idx,
             split=split,
             method=method,
         )
         starting_idx += mol.GetNumAtoms()
+    write_atom_features(all_atom_features, save_path)
 
 
 def main():

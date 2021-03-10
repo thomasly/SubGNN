@@ -959,7 +959,9 @@ class SubGNN(pl.LightningModule):
 
     def _init_node_emb(self):
         pretrained_node_embeds = torch.load(
-            config.PROJECT_ROOT / self.embedding_path, torch.device("cpu")
+            config.PROJECT_ROOT / self.embedding_path, torch.device("cpu"),
+        ).to(
+            torch.float
         )  # feature matrix should be initialized to the node embeddings
         self.hparams["node_embed_size"] = pretrained_node_embeds.shape[1]
         zeros = torch.zeros(1, pretrained_node_embeds.shape[1])

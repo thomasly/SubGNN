@@ -105,7 +105,7 @@ def build_model(run_config, trial=None):
     torch.backends.cudnn.benchmark = False
 
     # initialize SubGNN
-    model = md.SubGNN(
+    model = md.SubGNN_Chem(
         hyperparameters,
         run_config["graph_path"],
         run_config["subgraphs_path"],
