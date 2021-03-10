@@ -1,7 +1,7 @@
 from SubGNN import config as general_config
 
 # Output directory ('density' as an example)
-DATASET_DIR = general_config.PROJECT_ROOT / "testing_data"
+DATASET_DIR = general_config.PROJECT_ROOT / "bace"
 
 # Random Seed
 RANDOM_SEED = 42

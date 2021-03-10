@@ -4,6 +4,7 @@ from random import shuffle, seed
 from rdkit import Chem
 import pandas as pd
 from tqdm import tqdm
+from PyFingerprint.All_Fingerprint import get_fingerprint
 
 from SubGNN import config
 from . import config_prepare_dataset as pdconfig
@@ -46,30 +47,22 @@ allowable_features = {
 }
 
 
-def _mol_from_smiles(mol):
-    if isinstance(mol, str):
-        smiles = mol
-        mol = Chem.MolFromSmiles(mol)
-    if mol is None:
-        raise RuntimeError(
-            f"The SMILES ({smiles}) can't be converted to rdkit Mol object."
-        )
-    mol = Chem.AddHs(mol)
-    return mol
+def get_pubchem_fingerprint(smiles):
+    fp = get_fingerprint(smiles, fp_type="pubchem", output="vector")
+    return list(map(str, list(fp)))
 
 
-def find_subgraph_and_label(mol, patterns):
-    mol = _mol_from_smiles(mol)
+def find_subgraph_and_label(mol, smiles, patterns):
     subgraphs = dict()
     for i, pat in enumerate(patterns):
         matches = mol.GetSubstructMatches(pat)
         if len(matches) > 0:
             subgraphs[i] = matches
-    return subgraphs
+    label = get_pubchem_fingerprint(smiles)
+    return subgraphs, label
 
 
 def find_edge_list(mol):
-    mol = _mol_from_smiles(mol)
     edge_list = list()
     for bond in mol.GetBonds():
         start = bond.GetBeginAtomIdx()
@@ -79,7 +72,6 @@ def find_edge_list(mol):
 
 
 def generate_node_feat(mol):
-    mol = _mol_from_smiles(mol)
     atom_features_list = []
     for atom in mol.GetAtoms():
         atom_feature = (
@@ -104,7 +96,10 @@ def generate_node_feat(mol):
 
 def write_to_subgraphs(
     edgelist,
+    atom_ids,
     subgraphs,
+    label,
+    smiles,
     atom_features,
     path=None,
     starting_idx=0,
@@ -144,13 +139,16 @@ def write_to_subgraphs(
     edge_list_f.close()
 
     subgraphs_f = open(os.path.join(path, "subgraphs.pth"), method)
-    for key, value in subgraphs.items():
+    atom_ids = [str(id + starting_idx) for id in atom_ids]
+    subgraphs_f.write("-".join(atom_ids) + "\t")
+    subgraphs_f.write("-".join(label) + "\t")
+    for value in subgraphs.values():
         for subgraph in value:
             subgraphs_f.write(
                 "-".join(map(lambda x: str(x + starting_idx), subgraph)) + "\t"
             )
-            subgraphs_f.write(str(key) + "\t")
-            subgraphs_f.write(split + "\n")
+    subgraphs_f.write(smiles)
+    subgraphs_f.write("\n")
     subgraphs_f.close()
 
     atom_features_f = open(os.path.join(path, "atom_features.pth"), method)
@@ -196,7 +194,8 @@ def to_subgraphs(patterns, ser, save_path):
             continue
         mol = Chem.AddHs(mol)
         edgelist = find_edge_list(mol)
-        subgraphs = find_subgraph_and_label(mol, patterns)
+        subgraphs, label = find_subgraph_and_label(mol, smi, patterns)
+        atom_ids = [a.GetIdx() for a in mol.GetAtoms()]
         atom_features = generate_node_feat(mol)
         if i in train_indices:
             split = "train"
@@ -210,7 +209,10 @@ def to_subgraphs(patterns, ser, save_path):
             method = "a"
         write_to_subgraphs(
             edgelist,
+            atom_ids,
             subgraphs,
+            label,
+            smi,
             atom_features,
             save_path,
             starting_idx,

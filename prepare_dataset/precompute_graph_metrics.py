@@ -1,6 +1,7 @@
 # General
 import snap
 import numpy as np
+import scipy.sparse as sp
 import json
 import os
 import multiprocessing
@@ -59,22 +60,28 @@ def calculate_stats():
     if config.CALCULATE_SHORTEST_PATHS:
         print(f"Calculating shortest paths for {config.DATASET_DIR}...")
         if (
-            not (config.DATASET_DIR / "shortest_path_matrix.npy").exists()
+            not (config.DATASET_DIR / "shortest_path_matrix.npz").exists()
             or config.OVERRIDE
         ):
 
             with multiprocessing.Pool(processes=config.N_PROCESSSES) as pool:
-                shortest_paths = list()
                 chunk = 1000
                 i = 0
                 while i * chunk < len(node_ids):
                     print(f"Chunk #{i+1}/{int(len(node_ids)/chunk)+1}")
                     slc = slice(i * chunk, min((i + 1) * chunk, len(node_ids)))
-                    shortest_paths.extend(pool.map(get_shortest_path, node_ids[slc]))
+                    new_paths = pool.map(get_shortest_path, node_ids[slc])
+                    if "shortest_paths" not in locals():
+                        shortest_paths = sp.csr_matrix(new_paths, dtype=np.int)
+                    else:
+                        shortest_paths = sp.vstack(
+                            [shortest_paths, sp.csr_matrix(new_paths, dtype=np.int)]
+                        )
                     i += 1
-            all_shortest_paths = np.stack(shortest_paths)
-            np.save(
-                str(config.DATASET_DIR / "shortest_path_matrix.npy"), all_shortest_paths
+            print("Shortest paths calculation with multiprocessing finished...")
+            print("Saving shortest paths...")
+            sp.save_npz(
+                str(config.DATASET_DIR / "shortest_path_matrix.npz"), shortest_paths
             )
 
 
