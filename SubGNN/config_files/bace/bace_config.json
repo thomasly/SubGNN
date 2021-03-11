@@ -25,7 +25,7 @@
         "node_embed_size": 32,
         "structure_patch_type": "triangular_random_walk",
         "lstm_aggregator": "last",
-        "n_processes": 20,
+        "n_processes": 4,
         "resample_anchor_patches": false,
         "freeze_node_embeds": false,
         "use_mpn_projection": true,
@@ -41,12 +41,10 @@
     },
     "hyperparams_optuna": {
         "batch_size": {
-            "type": "suggest_categorical",
+            "type": "suggest_int",
             "args": [
-                [
-                    64,
-                    128
-                ]
+                16,
+                32
             ]
         },
         "learning_rate": {
